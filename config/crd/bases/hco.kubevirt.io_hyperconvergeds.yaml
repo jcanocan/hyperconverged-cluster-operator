@@ -2236,6 +2236,18 @@ spec:
                     - Custom
                     type: string
                 type: object
+              tuning:
+                description: tuning HyperConvergedConfig influences KubeVirt qps and
+                  burst parameters.
+                properties:
+                  burst:
+                    description: Burst indicates the maximum burst for throttle.
+                    type: integer
+                  qps:
+                    description: QPS indicates the maximum QPS to the apiserver from
+                      this client.
+                    type: integer
+                type: object
               uninstallStrategy:
                 default: BlockUninstallIfWorkloadsExist
                 description: 'UninstallStrategy defines how to proceed on uninstall

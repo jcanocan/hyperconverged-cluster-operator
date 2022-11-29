@@ -35,6 +35,10 @@ type HyperConvergedSpec struct {
 	// Deprecated: LocalStorageClassName the name of the local storage class.
 	LocalStorageClassName string `json:"localStorageClassName,omitempty"`
 
+	// tuning HyperConvergedConfig influences KubeVirt qps and burst parameters.
+	// +optional
+	Tuning *Tuning `json:"tuning,omitempty"`
+
 	// infra HyperConvergedConfig influences the pod configuration (currently only placement)
 	// for all the infra components needed on the virtualization enabled cluster
 	// but not necessarily directly on each node running VMs/VMIs.
@@ -212,6 +216,17 @@ type HyperConvergedConfig struct {
 	// NodePlacement describes node scheduling configuration.
 	// +optional
 	NodePlacement *sdkapi.NodePlacement `json:"nodePlacement,omitempty"`
+}
+
+// Tuning modifies the burst and qps parameters
+type Tuning struct {
+	// Burst indicates the maximum burst for throttle.
+	// +optional
+	Burst int `json:"burst,omitempty"`
+
+	// QPS indicates the maximum QPS to the apiserver from this client.
+	// +optional
+	QPS int `json:"qps,omitempty"`
 }
 
 // LiveMigrationConfigurations - Live migration limits and timeouts are applied so that migration processes do not

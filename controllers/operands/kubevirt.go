@@ -270,6 +270,23 @@ func NewKubeVirt(hc *hcov1beta1.HyperConverged, opts ...string) (*kubevirtcorev1
 	return kv, nil
 }
 
+func hcRateLimiter2Kv(hcoTuning *hcov1beta1.Tuning) (*kubevirtcorev1.ReloadableComponentConfiguration, error) {
+	var kvReloadable *kubevirtcorev1.ReloadableComponentConfiguration
+	if hcoTuning != nil {
+		kvReloadable = &kubevirtcorev1.ReloadableComponentConfiguration{
+			RestClient: &kubevirtcorev1.RESTClientConfiguration{
+				RateLimiter: &kubevirtcorev1.RateLimiter{
+					TokenBucketRateLimiter: &kubevirtcorev1.TokenBucketRateLimiter{
+						QPS:   float32(hcoTuning.QPS),
+						Burst: hcoTuning.Burst,
+					},
+				},
+			},
+		}
+	}
+	return kvReloadable, nil
+}
+
 func hcWorkloadUpdateStrategyToKv(hcObject *hcov1beta1.HyperConvergedWorkloadUpdateStrategy) kubevirtcorev1.KubeVirtWorkloadUpdateStrategy {
 	kvObject := kubevirtcorev1.KubeVirtWorkloadUpdateStrategy{}
 	if hcObject != nil {
@@ -305,6 +322,11 @@ func getKVConfig(hc *hcov1beta1.HyperConverged) (*kubevirtcorev1.KubeVirtConfigu
 		return nil, err
 	}
 
+	rateLimiter, err := hcRateLimiter2Kv(hc.Spec.Tuning)
+	if err != nil {
+		return nil, err
+	}
+
 	obsoleteCPUs, minCPUModel := getObsoleteCPUConfig(hc.Spec.ObsoleteCPUs)
 
 	config := &kubevirtcorev1.KubeVirtConfiguration{
@@ -319,6 +341,10 @@ func getKVConfig(hc *hcov1beta1.HyperConverged) (*kubevirtcorev1.KubeVirtConfigu
 		ObsoleteCPUModels:            obsoleteCPUs,
 		MinCPUModel:                  minCPUModel,
 		TLSConfiguration:             hcTLSSecurityProfileToKv(hcoutil.GetClusterInfo().GetTLSSecurityProfile(hc.Spec.TLSSecurityProfile)),
+		APIConfiguration:             rateLimiter,
+		WebhookConfiguration:         rateLimiter,
+		ControllerConfiguration:      rateLimiter,
+		HandlerConfiguration:         rateLimiter,
 	}
 
 	if smbiosConfig, ok := os.LookupEnv(smbiosEnvName); ok {

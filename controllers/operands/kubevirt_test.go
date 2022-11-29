@@ -2524,6 +2524,72 @@ Version: 1.2.3`)
 			}))
 		})
 
+		Context("Tune rateLimiters", func() {
+			var hco *hcov1beta1.HyperConverged
+
+			BeforeEach(func() {
+				hco = commonTestUtils.NewHco()
+			})
+
+			It("Should be empty by default", func() {
+				kv, err := NewKubeVirt(hco)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(hco.Spec.Tuning).To(BeNil())
+				Expect(kv.Spec.Configuration.APIConfiguration).To(BeNil())
+				Expect(kv.Spec.Configuration.ControllerConfiguration).To(BeNil())
+				Expect(kv.Spec.Configuration.WebhookConfiguration).To(BeNil())
+				Expect(kv.Spec.Configuration.HandlerConfiguration).To(BeNil())
+
+			})
+
+			It("Should create the fields and populate them when requested", func() {
+				burst := 100
+				qps := float32(50)
+				hco.Spec.Tuning = &hcov1beta1.Tuning{Burst: burst, QPS: int(qps)}
+				kv, err := NewKubeVirt(hco)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(hco.Spec.Tuning).ToNot(BeNil())
+
+				Expect(kv.Spec.Configuration.APIConfiguration).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.APIConfiguration.RestClient).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.APIConfiguration.RestClient.RateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.APIConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.APIConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.APIConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter.QPS).Should(Equal(qps))
+				Expect(kv.Spec.Configuration.APIConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter.Burst).Should(Equal(burst))
+
+				Expect(kv.Spec.Configuration.ControllerConfiguration).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.ControllerConfiguration.RestClient).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.ControllerConfiguration.RestClient.RateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.ControllerConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.ControllerConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.ControllerConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter.QPS).Should(Equal(qps))
+				Expect(kv.Spec.Configuration.ControllerConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter.Burst).Should(Equal(burst))
+
+				Expect(kv.Spec.Configuration.WebhookConfiguration).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.WebhookConfiguration.RestClient).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.WebhookConfiguration.RestClient.RateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.WebhookConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.WebhookConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.WebhookConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter.QPS).Should(Equal(qps))
+				Expect(kv.Spec.Configuration.WebhookConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter.Burst).Should(Equal(burst))
+
+				Expect(kv.Spec.Configuration.HandlerConfiguration).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.HandlerConfiguration.RestClient).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.HandlerConfiguration.RestClient.RateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.HandlerConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.HandlerConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter).ToNot(BeNil())
+				Expect(kv.Spec.Configuration.HandlerConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter.QPS).Should(Equal(qps))
+				Expect(kv.Spec.Configuration.HandlerConfiguration.RestClient.RateLimiter.TokenBucketRateLimiter.Burst).Should(Equal(burst))
+
+			})
+
+			It("Should update fields when they exists", func() {
+				//TODO: I'm not sure if this is a valid test case since the whole kv object will be recreated
+			})
+
+		})
+
 		Context("jsonpath Annotation", func() {
 
 			getClusterInfo := hcoutil.GetClusterInfo
