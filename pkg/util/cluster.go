@@ -34,6 +34,7 @@ type ClusterInfo interface {
 	GetPod() *corev1.Pod
 	GetDeployment() *appsv1.Deployment
 	GetCSV() *csvv1alpha1.ClusterServiceVersion
+	GetNodeCount() int
 }
 
 type ClusterInfoImp struct {
@@ -47,6 +48,7 @@ type ClusterInfoImp struct {
 	baseDomain                    string
 	ownResources                  *OwnResources
 	logger                        logr.Logger
+	nodeCount                     int
 }
 
 var clusterInfo ClusterInfo
@@ -118,6 +120,16 @@ func (c *ClusterInfoImp) initKubernetes(cl client.Client) error {
 
 	c.controlPlaneHighlyAvailable = len(masterNodeList.Items) >= 3
 	c.infrastructureHighlyAvailable = len(workerNodeList.Items) >= 2
+
+	//it is required to get the list again since a node can be both worker and master node
+	allNodeList := &corev1.NodeList{}
+	err = cl.List(context.TODO(), allNodeList)
+	if err != nil {
+		return err
+	}
+
+	c.nodeCount = len(allNodeList.Items)
+
 	return nil
 }
 
@@ -185,6 +197,10 @@ func (c ClusterInfoImp) GetDeployment() *appsv1.Deployment {
 
 func (c ClusterInfoImp) GetCSV() *csvv1alpha1.ClusterServiceVersion {
 	return c.ownResources.GetCSV()
+}
+
+func (c ClusterInfoImp) GetNodeCount() int {
+	return c.nodeCount
 }
 
 func getClusterDomain(ctx context.Context, cl client.Client) (string, error) {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"strconv"
@@ -276,39 +277,72 @@ func NewKubeVirt(hc *hcov1beta1.HyperConverged, opts ...string) (*kubevirtcorev1
 	return kv, nil
 }
 
-func hcoTuning2Kv(hc *hcov1beta1.HyperConverged) (*kubevirtcorev1.ReloadableComponentConfiguration, error) {
+func getHcoAnnotationTuning(hc *hcov1beta1.HyperConverged) (*kubevirtcorev1.ReloadableComponentConfiguration, error) {
 	var err error
-	if hc.Spec.TuningPolicy == hcov1beta1.HyperConvergedAnnotationTuningPolicy {
-		if annotation, ok := hc.Annotations[common.TuningPolicyAnnotationName]; ok {
+	if annotation, ok := hc.Annotations[common.TuningPolicyAnnotationName]; ok {
 
-			var rates rateLimits
-			err := json.Unmarshal([]byte(annotation), &rates)
-			if err != nil {
-				return nil, err
-			}
+		var rates rateLimits
+		err := json.Unmarshal([]byte(annotation), &rates)
+		if err != nil {
+			return nil, err
+		}
 
-			if rates.Qps <= 0 {
-				return nil, fmt.Errorf("qps parameter not found in annotation")
-			}
-			if rates.Burst <= 0 {
-				return nil, fmt.Errorf("burst parameter not found in annotation")
-			}
+		if rates.Qps <= 0 {
+			return nil, fmt.Errorf("qps parameter not found in annotation")
+		}
+		if rates.Burst <= 0 {
+			return nil, fmt.Errorf("burst parameter not found in annotation")
+		}
 
-			return &kubevirtcorev1.ReloadableComponentConfiguration{
-				RestClient: &kubevirtcorev1.RESTClientConfiguration{
-					RateLimiter: &kubevirtcorev1.RateLimiter{
-						TokenBucketRateLimiter: &kubevirtcorev1.TokenBucketRateLimiter{
-							QPS:   rates.Qps,
-							Burst: rates.Burst,
-						},
+		return &kubevirtcorev1.ReloadableComponentConfiguration{
+			RestClient: &kubevirtcorev1.RESTClientConfiguration{
+				RateLimiter: &kubevirtcorev1.RateLimiter{
+					TokenBucketRateLimiter: &kubevirtcorev1.TokenBucketRateLimiter{
+						QPS:   rates.Qps,
+						Burst: rates.Burst,
 					},
 				},
-			}, nil
-		} else {
-			err = fmt.Errorf("tuning policy set but annotation not present or wrong")
-		}
+			},
+		}, nil
+	} else {
+		err = fmt.Errorf("tuning policy set but annotation not present or wrong")
 	}
+
 	return nil, err
+}
+
+func getHcoTopologyProfileTuning() (*kubevirtcorev1.ReloadableComponentConfiguration, error) {
+	baseQps := 60
+	baseBurst := 130
+	nodes := hcoutil.GetClusterInfo().GetNodeCount()
+	logger.Info(fmt.Sprintf("NODE COUNT: %d", nodes))
+
+	// A logarithmic function allows to increase the values fast in when the node count is low
+	// but no so fast when the node count is high. This is because when the node count is high
+	// it's not required to increase the values since more virt-api replicas are deployed, see:
+	// https://github.com/kubevirt/kubevirt/blob/v0.58.0/pkg/virt-operator/resource/apply/apps.go#L405
+	qps := baseQps * int(math.Log2(float64(nodes+1)))
+	burst := baseBurst * int(math.Log2(float64(nodes+1)))
+
+	return &kubevirtcorev1.ReloadableComponentConfiguration{
+		RestClient: &kubevirtcorev1.RESTClientConfiguration{
+			RateLimiter: &kubevirtcorev1.RateLimiter{
+				TokenBucketRateLimiter: &kubevirtcorev1.TokenBucketRateLimiter{
+					QPS:   float32(qps),
+					Burst: burst,
+				},
+			},
+		},
+	}, nil
+}
+
+func hcoTuning2Kv(hc *hcov1beta1.HyperConverged) (*kubevirtcorev1.ReloadableComponentConfiguration, error) {
+	if hc.Spec.TuningPolicy == hcov1beta1.HyperConvergedAnnotationTuningPolicy {
+		return getHcoAnnotationTuning(hc)
+	} else if hc.Spec.TuningPolicy == hcov1beta1.HyperConvergedTopologyTuningPolicy {
+		return getHcoTopologyProfileTuning()
+	}
+	return nil, nil
 }
 
 func hcWorkloadUpdateStrategyToKv(hcObject *hcov1beta1.HyperConvergedWorkloadUpdateStrategy) kubevirtcorev1.KubeVirtWorkloadUpdateStrategy {
